@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔄</text></svg>">
+    <title>Reordena Las Palabras</title>
+    <style>
+        body {
+            background-image: url('textura_diamantes.png');
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            transition: background-color 0.4s ease;
+        }
+        .game-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: white;
+            justify-content: center;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 80%;
+            max-width: 800px;
+            min-height: 380px;
+        }
+        #words-container {
+            display: flex;
+            flex-direction: row-reverse;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .word {
+            display: inline-flex;
+            padding: 10px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: move;
+            user-select: none;
+            touch-action: none;
+            direction: rtl; /* setea el texto de derecha a izquierda, para que se vean bien las comas al final de una palabra*/
+        }
+        .word.dragging {
+            opacity: 0.5;
+        }
+        .word.dragging{
+            animation: pulseDrag 0.3s infinite;
+        }
+        @keyframes pulseDrag {
+            0%{border-color: red}
+            50%{border-color: white}
+            100%{border-color: red}
+        }
+        #message_container {
+            display: none; /* estado inicial invisible, luego cambia a display: flex */
+            width: 98%;
+            justify-content: center;
+            position: absolute;
+            /* margin-left: -16px; */ 
+            bottom: 0px;
+            z-index: 99999;
+        }
+        #message {
+            margin-top: 20px;
+            font-weight: bold;
+            text-align: center;
+            left: 0;
+            background-color: #FFD700;
+            color: #000;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .muestra-ayuda{
+            color: grey;
+            height: 39px;
+        }
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 13px;
+            color: #999;
+        }
+        .creditos{
+            position: fixed;
+            bottom: 10px;
+            text-align: center;
+            font-size: 13px;
+            color: #999;
+        }
+        h1 {
+            align-self: center;
+            font-size: 24px;
+            color: #2f4757;
+            text-shadow: 0px 1px 3px #ffffffc2;
+            margin-bottom: 0px;
+            text-align: center;
+        }
+        .encabezado {
+            position: fixed;
+            align-self: center;
+            top: 1vw;
+            color: #2f4757;
+            max-width: 85vw;
+        }
+        .edicion{
+            margin-top: 0px;
+            align-self: center;
+            color: #2f4757;
+            text-align: center;
+        }
+        .boton-reiniciar{
+            background-color: white;
+            border: 1px solid #ff005a;
+            border-radius: 3px;
+            color: #ff005a;
+            margin-top: 7px;
+            padding: 3px 5px 2px 5px;
+        }
+        .pista{
+            background-color: white;
+            border: 1px solid #ff005a;
+            border-radius: 3px;
+            color: #ff005a;
+            margin-top: 7px;
+            padding: 3px 5px 2px 5px;
+            opacity: 0.7;
+        }
+        .pista:hover{
+            color: white;
+            background-color: #ff005a;
+        }
+    </style>
+</head>
+<body>
+    <div class="encabezado">
+        <h1>Reordena Las Palabras</h1>
+        <p class="edicion">Edición: pronombres Hebreo bíblico</p>
+    </div>
+    <div id="game-container" class="game-container">
+        <button id="pista" class="pista" onclick="muestra_oculta_pista()">PISTA</button>
+        <p id="frase"></p>
+        <div id="words-container"></div>
+        <div id="muestra-ayuda" class="muestra-ayuda">Toque una palabra para ver su fonética y significado</div>
+
+        <div id="message_container">
+            <div id="message"></div>
+        </div>
+
+        <div class="footer">para el grupo Aprendizaje Hebreo Compartido</div>
+    </div>
+
+    <div class="creditos">Idea, diseño y programación: Esteban Capella</div>
+
+    <script>
+                  // en el tercer elemento las palabras se separan por guines dobles, poner espacios para poner vairas palabras como un item único
+        const AllFrases = [
+            [
+                //pronombre anojí
+                 "אָנֹכִי אֵלֵךְ בְּדֶרֶךְ כָּל הָאָרֶץ וְחָזַקְתָּ וְהָיִיתָ לְאִישׁ",
+                 "anoji elej bederej kol ha'aretz vejazakta vehayita le'ish",
+                 "yo--voy--por el camino--de toda--la tierra,--esfuérzate--y sé--hombre" //(1 Reyes 2:2)
+            ],
+            [
+                //pronombre atá
+                 "אַתָּה אֶת בְּרִיתִי תִּשְׁמֹר אַתָּה וְזַרְעֲךָ אַחֲרֶיךָ לְדֹרֹתָם",
+                 "atá et brití tishmór atá vezar'aja ajaréja ledorotám",
+                 "tú--objeto directo--mi pacto--guardarás--tú--y tu descendencia--después de ti--por sus generaciones" //(Génesis 17:b)
+            ],
+            [
+                //pronombre at
+                 "וַיֹּאמֶר אֶל שָׂרַי אִשְׁתּוֹ הִנֵּה נָא יָדַעְתִּי כִּי אִשָּׁה יְפַת מַרְאֶה אָֽתְּ",
+                 "va-yómer el Sarái ishtó híne na yada'áti ki ishá yefát mar'é at",
+                 "y dijo--a--Sarai--su mujer--mira--te ruego--conozco--que--mujer--de aspecto--hermoso--tú" //(Génesis 12:11)
+            ],
+            [
+                //pronombre hu
+                 "כֹּל אֲשֶׁר אֵֽין לוֹ סְנַפִּיר וְקַשְׂקֶשֶׂת בַּמָּיִם שֶׁקֶץ הוּא לָכֶֽם",
+                 "col ashér en lo senapír ve-kaskéset ba-máim sheketz hu lajém",
+                 "todo--lo que--no tenga--para él--aletas--y escamas--en las aguas--abominación--él--para vosotros" //(Levíticos 11:12)
+            ],
+            [
+                //pronombre hi
+                 "וְהֵם יָצְאוּ וַיִּגַּלוּהוּ בְּכָל הָאָרֶץ הַהִיא",
+                 "ve-hem yatzú va-yigaluhú becól ha-áretz ha-hí",
+                 "y ellos--salieron--y lo revelaron--en toda--la tierra--aquella " //(Mateo 9:31, manuscrito hebreo de Shem Tov)
+            ],
+            [
+                //pronombre anu
+                 "אִם טוֹב וְאִם רָע בְּקוֹל יְהֹוָה אֱלֹהֵינוּ אֲשֶׁר אָנוּ שֹׁלְחִים אֹתְךָ אֵלָיו נִשְׁמָע",
+                 "im tov ve-im ra becól yehováh elohéinu ashér anu sholejím otjá aláv nishmá",
+                "si--bueno--o si--malo--<en> la voz--de Yehováh--nuestro Dios--el cual--nosotros--enviamos--a tí--a él--oiremos-obedeceremos" //(Anu: Jeremías 42:6)
+            ],
+            [
+                //pronombre atem
+                 "חָנֻּנִי חָנֻּנִי אַתֶּם רֵעָי כִּי יַד אֱלוֹהַּ נָגְעָה בִּֽי",
+                 "jonúni jonúni atém reái ki yad elóaj naguéa bi",
+                "tengan piedad de mí--tengan piedad de mí--vosotros--mis amigos--porque--la mano--de Eloaj <Dios>--ha golpeado--a mí" //(Job 19:21)
+            ],
+            [
+                //pronombre aten
+                 "וְאַתֵּנָה יְדַעְתֶּן כִּי בְּכָל כֹּחִי עָבַדְתִּי אֶת אֲבִיכֶֽן",
+                 "ve-atenah yedaatén ki bejól cojí abádti et abijém",
+                "Y vosotras--sabéis--que--con todas--mis fuerzas--he servido--a <objeto directo>--vuestro padre" //(Atenah  Genesis 31:6)
+            ],
+            [
+                //pronombre hem
+                 "הַבֹּקֶר אוֹר וְהָאֲנָשִׁים שֻׁלְּחוּ הֵמָּה וַחֲמֹרֵיהֶֽם",
+                 "ha-bóker or ve-haanashím shulejú hema va-hamorehém",
+                "<en> la mañana--<con> luz--y los hombres--fueron enviados--ellos--y sus asnos" //(hema Genesis 44:3)
+            ],
+            [
+                //pronombre hena
+                 "וַיִּרְאוּ בְנֵי הָֽאֱלֹהִים אֶת בְּנוֹת הָֽאָדָם כִּי טֹבֹת הֵנָּה וַיִּקְחוּ לָהֶם נָשִׁים מִכֹּל אֲשֶׁר בָּחָֽרוּ",
+                 "va-yir'ú bené ha-elohim et benót ha-adám ki tovot hena va-yikejú lahém nashím micól asher bajáru",
+                "y vieron--los hijos de--los dioses--a <objeto directo>--las hijas--de adam <del hombre>--que--buenas--<eran> ellas--y tomaron--para ellos--mujeres--de todo--lo que--les gustaron" //(Hena Genesis 6:2)
+            ]
+        ];
+
+        shuffleArray(AllFrases); // mezclo array
+        const randomFrase = AllFrases[Math.floor(Math.random() * AllFrases.length)]; // elijo item al azar del array ya mezclado
+
+        const fraseOriginal = randomFrase[0];
+        const fraseOriginalFonetica = randomFrase[1];
+        const fraseOriginalTraduccion = randomFrase[2]
+        const fraseOriginalTraduccionSinGuiones = fraseOriginalTraduccion.split('--').join(' ');
+        const fraseOriginalTraduccion_split = fraseOriginalTraduccion.split('--');
+        const fraseOriginal_split = fraseOriginal.split(' ');
+        const fonetica = fraseOriginalFonetica.split(' ');
+        //document.getElementById('frase').innerText = fraseOriginal;
+        let words = fraseOriginal.split(' ');
+        let fraseOriginal_boundaries = '--' + words.join('-- --') + '--'; // esto es para matchear correctamente al comparar seucencias
+        const wordsContainer = document.getElementById('words-container');
+        const messageElement = document.getElementById('message');
+        let draggedElement = null;
+        const lightColors = ["#a3ffa3", "#bbe1fd", "#ffffc4", "#ffcae0", "#ffb293", "#8effff", "#ffc1c1", "#ffd39a", "#bad0ed", "#2efff7", "#d5ffa7"];
+        let orderWords_previous = []; //para controlar si cambia de orden las palabras al hacer dragging
+        let elementoPrevio = null; // para seleccionar target del gradding y restaurarlo
+        let backupText = ""; // para guardar y restaurar texto original cuando es añadido un cursor
+        //let touchTargetPrevio = null; // para guardar elemento tocado al que se le añade un borde rojo para mostrar su fonetica
+        const elementoAyuda = document.getElementById("muestra-ayuda");
+        const ayudaMensajeInicial = document.getElementById('muestra-ayuda').innerText;
+        const pista = `Primer palabra: ${fraseOriginal_split[0]}, última palabra: ${fraseOriginal_split.slice(-1)[0]}`;
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function createWordElements() {
+            shuffleArray(words);
+            words.forEach((word, index) => {
+                const wordElement = document.createElement('div');
+                wordElement.textContent = word;
+                wordElement.className = 'word';
+                wordElement.id = `palabra-${index}`;
+                let posicion_fonetica = fraseOriginal_split.indexOf(word);
+                console.log(posicion_fonetica);
+                let wordFonetica = fonetica[posicion_fonetica] + " (" + fraseOriginalTraduccion_split[posicion_fonetica] + ")";
+                wordElement.dataset.value = `${wordFonetica}`;
+                addEventListeners(wordElement);
+                wordsContainer.appendChild(wordElement);
+            });
+        }
+
+        function addEventListeners(element) {
+            element.addEventListener('mousedown', dragStart);
+            element.addEventListener('touchstart', dragStart, {passive: false});
+            element.addEventListener('mouseup', (event) => dragEnd(event.target));
+            element.addEventListener('touchend', (event) => dragEnd(event.target));
+        }
+
+        function dragStart(e) {
+            if (e.type === 'touchstart') {
+                e.preventDefault();
+            }
+            draggedElement = this;
+            this.classList.add('dragging');
+            
+            if (e.type === 'touchstart') {
+                document.addEventListener('touchmove', drag, {passive: false});
+            } else {
+                document.addEventListener('mousemove', drag);
+            }
+            try{
+                touchTargetPrevio.style.border = "";
+            } catch (error){ console.log("parece que no había touchTargetPrevio para quitar") }
+        }
+
+        function dragEnd(touchTarget) {
+            if (draggedElement) {
+                draggedElement.classList.remove('dragging');
+                draggedElement = null;
+                document.removeEventListener('mousemove', drag);
+                document.removeEventListener('touchmove', drag);
+                try{
+                    elementoPrevio.innerText = backupText;
+                } catch (error){ console.log("parece que no había elemento previo") }
+                checkSequences(touchTarget);
+            }
+        }
+
+        function drag(e) {
+            if (!draggedElement) return;
+            e.preventDefault();
+
+            const mouseX = e.clientX || e.touches[0].clientX;
+            const mouseY = e.clientY || e.touches[0].clientY;
+
+            const targetElement = document.elementFromPoint(mouseX, mouseY);
+
+            if (targetElement && targetElement.classList.contains('word') && targetElement !== draggedElement) {
+                //swapElements(draggedElement, targetElement); // esta función no la uso
+
+                //calculate percentage of pointer respect the target
+                let percentage = ( 0 + mouseX - targetElement.getBoundingClientRect().x ) * 100 / targetElement.clientWidth; // posición del mouse desde inicio del elemento, por cien, dividido wid del elemento
+                if (percentage > 50){
+                    insertElement(draggedElement, targetElement, "after"); // inserto a la derecha del target
+                } else{
+                    insertElement(draggedElement, targetElement, "before"); // inserto a la izquierda del target
+                }
+            }
+        }
+
+        function insertElement(el1, el2, position) {
+            //el1: elemento a mover; el2: elemento destino
+            //backupText = el1.innerText;
+            //el1.innerHTML = `<div class='insert-indicator indicator-left'></div>${backupText}<div class='insert-indicator indicator-right'></div>`;
+            if (position == "after"){
+                el2.insertAdjacentElement('beforebegin', el1);
+            } else{
+                el2.insertAdjacentElement('afterend', el1);
+            }
+            //elementoPrevio = el1; //guardo elemento moviendo actual para restarurar en próximo target
+        }
+
+        function swapElements(el1, el2) {
+            const nextEl1 = el1.nextElementSibling;
+            const parent = el1.parentNode;
+            el2.parentNode.insertBefore(el1, el2);
+            parent.insertBefore(el2, nextEl1);
+        }
+
+        function getRandomLightColor() {
+            return lightColors[Math.floor(Math.random() * lightColors.length)];
+        }
+
+        function startBackgroundAnimation() {
+            const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8'];
+            let index = 0;
+            setInterval(() => {
+                document.body.style.backgroundColor = colors[index];
+                index = (index + 1) % colors.length;
+            }, 400);
+            document.body.style.backgroundImage = "none";
+        }
+
+        function checkSequences(touchTarget) {
+            // obtengo orden de palabras actual
+            const currentWords = Array.from(wordsContainer.children).map(el => el.textContent);
+            //console.log("orden actual de palabras:");
+            //console.log(currentWords);
+
+            // me salgo si en realidad no se ha modificado el orden de las palabras, y muestro ayuda
+            if (currentWords.join('') === orderWords_previous.join('')){
+                //quito estilo de touchTargetPrevio
+                try {
+                    touchTargetPrevio.style.border = "";
+                } catch (error) {console.log("no hay bordes que quitar")}
+                //obtengo data del elemento tocado
+                let text = touchTarget.getAttribute("data-value");
+                elementoAyuda.innerText = text;
+                elementoAyuda.style.color = "#cd0010";
+                touchTarget.style.border = "1px solid #cd0010";
+                touchTargetPrevio = touchTarget;
+                return
+            } else {
+                elementoAyuda.style.color = "";
+                elementoAyuda.innerText = ayudaMensajeInicial;
+                try{
+                touchTargetPrevio.style.border == "";
+                } catch (error){
+                    console.log("parece que no había touchTarget previo");
+                }
+            }
+            
+            // Reseteo todas las palabras a fondo blanco y quito margenes
+            currentWords.forEach((_, index) => {
+                document.getElementById(`palabra-${index}`).style.backgroundColor = 'white';
+                document.getElementById(`palabra-${index}`).style.marginRight = '';
+            });
+
+            let currentColor = null;
+            
+            // concateno palabras
+            let secuenciaPalabras = []; //array temporal de palabras en secuencia
+            let colorSecuencia = '';
+            for (let i = 0; i <= currentWords.length; i++) {
+                if (currentWords.length == i){
+                    //añado un item fake en último lugar ucando se acaba el array de palabras, así entra en la próxima vuelta y colorea secuencia anterior si correponde y resetea
+                    secuenciaPalabras.push(["FAKE WORD PARA USAR EN ÚLTIMA INSTANCIA", i]);
+                } else {
+                    secuenciaPalabras.push([currentWords[i], i]); // añado palabra junto a su posición actual
+                }
+
+                // armo array con solo strings de secuencia actual
+                let secuenciaPalabras_string = [];
+                secuenciaPalabras.forEach((item)=>{
+                    secuenciaPalabras_string.push(item[0]);
+                });
+
+                let secuenciaPalabras_boundaries = '--' + secuenciaPalabras_string.join('-- --') + '--';
+                //console.log(`comparando:`);
+                //console.log(`${secuenciaPalabras_boundaries}  con:`);
+                //console.log(fraseOriginal_boundaries);
+                if (fraseOriginal_boundaries.includes(secuenciaPalabras_boundaries)){ //chequeo existe la secuencia en la frase orig
+                    //console.log("matchea secuencia!");
+                    //obtengo nuevo color solo si la secuencia es nueva
+                    if (colorSecuencia == ''){
+                        colorSecuencia = getRandomLightColor();
+                    }
+                } else if (secuenciaPalabras.length > 2) { //no hay secuencia y la anterior es mayor a una palabra (había secuencia formada)
+                    secuenciaPalabras.slice(0, -1).forEach((item, index)=>{
+                        //seteo color de la palabra
+                        wordsContainer.children[item[1]].style.backgroundColor = colorSecuencia;;
+                        //cambio márgenes izquierdos a partir de la segunda palabra para jutnarlas
+                        if (index > 0){
+                            wordsContainer.children[item[1]].style.marginRight = "-8px";
+                        }
+                    });
+                    // reinicio variables para empezar de nuevo
+                    secuenciaPalabras = [[currentWords[i], i]];
+                    colorSecuencia = '';
+                } else { // la secuencia actual no está en la frase original, y la anterior no es lo suficientemente larga para colorearla
+                    //console.log("no hay secuencia ni actual ni anterior");
+                    secuenciaPalabras = [[currentWords[i], i]];
+                    colorSecuencia = '';
+                }
+            }
+
+            if (currentWords.join(' ') === fraseOriginal) { // se formó la frase completa en el correcto orden
+                document.getElementById('frase').innerText = '" ' + fraseOriginalTraduccionSinGuiones + ' "';
+                document.getElementById('frase').style.fontStyle = "italic";
+                messageElement.innerHTML = "¡Felicidades! Has completado el juego correctamente.<br><button class='boton-reiniciar' onclick='location.reload()'>REINICIAR</button>";
+                document.getElementById("message_container").style.display = "flex";
+                startBackgroundAnimation();
+                audio.play();
+            } else {
+                messageElement.textContent = "";
+            }
+            orderWords_previous = currentWords; //guardo estado de palabras para comparra en el próximo dragging
+        }
+
+        function muestra_oculta_pista(){
+            pistaElem = document.getElementById('pista');
+            if (pistaElem.style.opacity == 1){
+                pistaElem.style.backgroundColor = "white";
+                pistaElem.style.color = "#ff005a";
+                pistaElem.style.opacity = "";
+                document.getElementById('frase').innerText = "";
+                return
+            }
+            pistaElem.style.backgroundColor = "#ff005a";
+            pistaElem.style.color = "white";
+            pistaElem.style.opacity = "1";
+            document.getElementById('frase').innerText = pista;
+        }
+
+        createWordElements();
+
+        // cargo sonido de ÉXITO
+        var audio = new Audio('success.mp3');
+        audio.load();
+    </script>
+</body>
+</html>
